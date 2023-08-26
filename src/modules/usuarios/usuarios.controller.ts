@@ -1,0 +1,102 @@
+import { Body, Controller, Get, HttpStatus, Param, Patch, Post, Query, Res, UseGuards } from '@nestjs/common';
+import { CambioPasswordDTO, UsuariosDTO } from './dto';
+import { UsuariosService } from './usuarios.service';
+import * as bcryptjs from 'bcryptjs';
+import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { ApiBearerAuth, ApiTags } from '@nestjs/swagger';
+import { Prisma, Usuarios } from '@prisma/client';
+
+@ApiTags('Usuarios')
+@Controller('usuarios')
+export class UsuariosController {
+
+  constructor(private readonly usuariosService: UsuariosService){}
+
+  @ApiBearerAuth('Authorization')
+  @UseGuards(JwtAuthGuard)
+  @Get(':id')
+  async getUsuario(@Res() res, @Param('id') id: number): Promise<any> {
+
+    const usuario = await this.usuariosService.getUsuario(id);
+
+    return res.status(HttpStatus.OK).json({
+      success: true,
+      message: 'Usuario obtenido correctamente',
+      usuario      
+    })
+
+  }
+
+  @ApiBearerAuth('Authorization')
+  @UseGuards(JwtAuthGuard)
+  @Get()
+  async listarUsuarios(@Res() res, @Query() query): Promise<any> {
+    const usuarios = await this.usuariosService.listarUsuarios(query);
+
+    return res.status(HttpStatus.OK).json({
+      success: true,
+      message: 'Usuarios obtenidos correctamente',
+      usuarios     
+    })
+
+  }
+
+  @ApiBearerAuth('Authorization')
+  @UseGuards(JwtAuthGuard)
+  @Post()
+  async createUsuario(@Res() res, @Body() createData: Prisma.UsuariosCreateInput): Promise<any> {
+
+    const { password } = createData;
+
+    // Encriptado de password
+    const salt = bcryptjs.genSaltSync();
+    createData.password = bcryptjs.hashSync(password, salt);
+
+    const usuario = await this.usuariosService.crearUsuario(createData);
+
+    return res.status(HttpStatus.CREATED).json({
+      success: true,
+      message: 'Usuario creado correctamente',
+      usuario
+    })
+  
+  }
+
+  @ApiBearerAuth('Authorization')
+  @UseGuards(JwtAuthGuard)
+  @Patch(':id')
+  async actualizarUsuario(@Res() res, @Param('id') id: number, @Body() dataUpdate: Prisma.UsuariosUpdateInput){
+
+    const { password } = dataUpdate;
+
+    // Se encripta el password en caso de que se tenga que actualizar
+    if(password){
+      const salt = bcryptjs.genSaltSync();
+      dataUpdate.password = bcryptjs.hashSync(password?.toString(), salt);
+    }
+
+    const usuario = await this.usuariosService.actualizarUsuario(id, dataUpdate);
+
+    res.status(HttpStatus.OK).json({
+      success: true,
+      message: 'Usuario actualizado correctamente',
+      usuario
+    })
+
+  }
+
+  @ApiBearerAuth('Authorization')
+  @UseGuards(JwtAuthGuard)
+  @Patch('/password/:id')
+  async actualizarPassword(@Res() res, @Param('id') id: number, @Body() dataChangePassword: CambioPasswordDTO){
+
+    await this.usuariosService.actualizarPasswordPerfil(id, dataChangePassword);
+
+    res.status(HttpStatus.OK).json({
+      success: true,
+      message: 'Password actualizado correctamente',
+    })
+
+  }
+
+}
